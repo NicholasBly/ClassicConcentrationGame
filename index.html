@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classic Concentration - Car Matching Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2px;
+            background-color: #000066;
+            color: white;
+        }
+        
+        .setup-container {
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .game-container {
+            display: none;
+            background-color: #cc0000;
+            padding: 20px;
+            border: 8px solid #0000cc;
+            border-radius: 8px;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+            padding: 8px;
+        }
+        
+        .square {
+            aspect-ratio: 4;
+            background-color: #ffcc00;
+            color: #cc0000;
+            border: 4px solid #cc0000;
+            border-radius: 4px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
+        }
+        
+        .square:hover:not(.revealed):not(.checking) {
+            background-color: #ffd700;
+        }
+        
+        .square.revealed {
+            background-color: #000;
+            color: white;
+            font-size: 16px;
+            padding: 5px;
+            word-wrap: break-word;
+            text-align: center;
+        }
+
+        .square.checking {
+            background-color: #000;
+            color: white;
+            font-size: 16px;
+            padding: 5px;
+        }
+        
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 24px;
+            color: #ffcc00;
+            text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+        }
+        
+        .timer-container {
+            position: relative;
+            width: 200px;
+            height: 100px;
+            margin: 20px auto;
+            background-color: #000;
+            border: 4px solid #cc0000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffcc00;
+            font-family: "Digital", monospace;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+        
+        button.control-btn {
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #ffcc00;
+            color: #cc0000;
+            border: 4px solid #cc0000;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 10px;
+        }
+        
+        button.control-btn:hover {
+            background-color: #ffd700;
+        }
+        
+        input[type="number"] {
+            padding: 10px;
+            font-size: 20px;
+            width: 100px;
+            margin: 0 10px;
+            border: 4px solid #cc0000;
+            border-radius: 4px;
+            background-color: #ffcc00;
+            color: #cc0000;
+            font-weight: bold;
+        }
+        
+        .message-log {
+            height: 80px;
+            overflow-y: auto;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 4px solid #cc0000;
+            border-radius: 4px;
+            color: #ffcc00;
+            font-size: 18px;
+        }
+
+        .square.disabled {
+            pointer-events: none;
+        }
+
+        @font-face {
+            font-family: 'Digital';
+            src: url('https://fonts.gstatic.com/s/share/v14/i7dJIFliZjMNNXVN.woff2') format('woff2');
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffcc00;
+            text-shadow: 3px 3px 0px #cc0000;
+            font-size: 36px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>CLASSIC CONCENTRATION</h1>
+    
+    <div class="setup-container" id="setup">
+        <h2>Game Setup</h2>
+        <p>Choose time limit (30-60 seconds):</p>
+        <input type="number" id="timeLimit" min="30" max="60" value="45">
+        <button class="control-btn" onclick="startGame()">Start Game</button>
+    </div>
+    
+    <div class="game-container" id="game">
+        <div class="timer-container">
+            <div class="timer" id="timer">45</div>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="message-log" id="messages"></div>
+        <div class="status" id="status"></div>
+        <button class="control-btn" onclick="resetGame()" style="display: block; margin: 0 auto;">Play Again</button>
+    </div>
+
+    <script>
+        class ConcentrationGame {
+            constructor() {
+                this.cars = [
+"LEMANS",
+"WRANGLER",
+"IROC",
+"ESCORT",
+"825-S",
+"GL",
+"CALAIS",
+"LANCER",
+"TRACER",
+"SAFARI WAGON",
+"ALLIANCE",
+"SHADOW",
+"CABRIOLET",
+"323",
+"FESTIVA",
+"CAMARO"
+                ];
+                this.reset();
+            }
+
+            reset() {
+                this.board = new Array(15).fill(null);
+                this.revealed = new Set();
+                this.currentlyRevealed = new Set();
+                this.matches = new Set();
+                this.gameActive = false;
+                this.matchedPairs = 0;
+                this.isChecking = false;
+            }
+
+            initializeBoard() {
+                const shuffledCars = [...this.cars]
+                    .sort(() => Math.random() - 0.5)
+                    .slice(0, 8);
+                
+                const positions = Array.from({length: 15}, (_, i) => i);
+                
+                shuffledCars.forEach((car, index) => {
+                    const positionsNeeded = index === 6 ? 1 : 2;
+                    
+                    for (let i = 0; i < positionsNeeded; i++) {
+                        const randomIndex = Math.floor(Math.random() * positions.length);
+                        const position = positions.splice(randomIndex, 1)[0];
+                        this.board[position] = car;
+                    }
+                });
+
+                if (positions.length > 0) {
+                    this.board[positions[0]] = shuffledCars[6];
+                }
+            }
+
+            selectPosition(position) {
+                if (!this.gameActive || this.revealed.has(position) || 
+                    this.currentlyRevealed.has(position) || this.isChecking) {
+                    return null;
+                }
+
+                const car = this.board[position];
+                this.currentlyRevealed.add(position);
+
+                if (this.currentlyRevealed.size === 2) {
+                    const [firstPosition] = this.currentlyRevealed;
+                    const firstCar = this.board[firstPosition];
+
+                    if (firstCar === car) {
+                        this.currentlyRevealed.forEach(pos => this.revealed.add(pos));
+                        this.matches.add(car);
+                        this.matchedPairs++;
+                        this.currentlyRevealed.clear();
+
+                        if (this.matchedPairs === 7 || this.revealed.size === 14) {
+                            this.gameActive = false;
+                            return { car, matched: true, gameWon: true, positions: [firstPosition, position] };
+                        }
+
+                        return { car, matched: true, gameWon: false, positions: [firstPosition, position] };
+                    } else {
+                        this.isChecking = true;
+                        return { car, matched: false, checking: true, positions: [firstPosition, position] };
+                    }
+                }
+
+                return { car, matched: false, checking: false, positions: [position] };
+            }
+
+            hideUnmatched() {
+                this.currentlyRevealed.clear();
+                this.isChecking = false;
+            }
+        }
+
+        let game = new ConcentrationGame();
+        let timerInterval;
+
+        function startGame() {
+            const timeLimit = parseInt(document.getElementById('timeLimit').value);
+            if (timeLimit < 30 || timeLimit > 60) {
+                alert('Please enter a time between 30 and 60 seconds');
+                return;
+            }
+
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            
+            game = new ConcentrationGame();
+            game.initializeBoard();
+            game.gameActive = true;
+
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            for (let i = 0; i < 15; i++) {
+                const square = document.createElement('button');
+                square.className = 'square';
+                square.textContent = (i + 1);
+                square.onclick = () => makeMove(i);
+                board.appendChild(square);
+            }
+
+            document.getElementById('messages').innerHTML = '';
+            document.getElementById('status').textContent = '';
+            
+            let timeRemaining = timeLimit;
+            document.getElementById('timer').textContent = `Time: ${timeRemaining}`;
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                document.getElementById('timer').textContent = `Time: ${timeRemaining}`;
+                
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    endGame(false);
+                }
+            }, 1000);
+        }
+
+        function makeMove(position) {
+            if (!game.gameActive) return;
+
+            const result = game.selectPosition(position);
+            if (!result) return;
+
+            const squares = document.getElementsByClassName('square');
+            result.positions.forEach(pos => {
+                const square = squares[pos];
+                square.textContent = game.board[pos];
+                if (result.checking) {
+                    square.classList.add('checking');
+                } else if (result.matched) {
+                    square.classList.add('revealed');
+                }
+            });
+
+            const messages = document.getElementById('messages');
+            messages.innerHTML += `<div>Selected: ${result.car}</div>`;
+            if (result.matched) {
+                messages.innerHTML += `<div>Matched pair: ${result.car}!</div>`;
+            }
+            messages.scrollTop = messages.scrollHeight;
+
+            if (result.checking) {
+                document.querySelectorAll('.square').forEach(square => {
+                    square.classList.add('disabled');
+                });
+
+                setTimeout(() => {
+                    result.positions.forEach(pos => {
+                        const square = squares[pos];
+                        square.textContent = pos + 1;
+                        square.classList.remove('checking');
+                    });
+                    game.hideUnmatched();
+                    document.querySelectorAll('.square').forEach(square => {
+                        square.classList.remove('disabled');
+                    });
+                }, 1000);
+            }
+
+            if (result.gameWon) {
+                endGame(true);
+            }
+        }
+
+        function endGame(won) {
+            game.gameActive = false;
+            clearInterval(timerInterval);
+            
+            const status = document.getElementById('status');
+            if (won) {
+                status.textContent = "Congratulations! You've won the game!";
+                status.style.color = '#4CAF50';
+            } else {
+                status.textContent = "Time's up! Game Over!";
+                status.style.color = '#D32F2F';
+            }
+        }
+
+        function resetGame() {
+            document.getElementById('setup').style.display = 'block';
+            document.getElementById('game').style.display = 'none';
+            clearInterval(timerInterval);
+        }
+    </script>
+</body>
+</html>
